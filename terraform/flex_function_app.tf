@@ -14,7 +14,7 @@ resource "azapi_resource" "linux_flex_function_app" {
       type : "SystemAssigned"
     }
     properties = {
-      serverFarmId = azapi_resource.server_farm_plan[0].id,
+      serverFarmId = azapi_resource.server_farm_plan.id,
       functionAppConfig = {
         deployment = {
           storage = {
