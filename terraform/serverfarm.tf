@@ -1,6 +1,5 @@
+# Note: Flex Consumption App Service plans CAN NOT be shared.
 resource "azapi_resource" "server_farm_plan" {
-  count = var.app_service_plan == null ? 1 : 0
-
   type                      = "Microsoft.Web/serverfarms@2023-12-01"
   schema_validation_enabled = false
   location                  = var.location

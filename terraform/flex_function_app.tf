@@ -1,6 +1,5 @@
 locals {
   deploymentContainer = "${azurerm_storage_account.storage_account.primary_blob_endpoint}deploymentpackage"
-  asp = var.app_service_plan == "" ? azapi_resource.server_farm_plan[0].id : var.app_service_plan
 }
 
 resource "azapi_resource" "linux_flex_function_app" {
@@ -15,7 +14,7 @@ resource "azapi_resource" "linux_flex_function_app" {
       type : "SystemAssigned"
     }
     properties = {
-      serverFarmId = local.asp,
+      serverFarmId = azapi_resource.server_farm_plan[0].id,
       functionAppConfig = {
         deployment = {
           storage = {
