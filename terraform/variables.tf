@@ -45,6 +45,6 @@ variable "runtime_version" {
 
 variable "app_service_plan" {
   type = string
-  default = ""
+  default = null
   description = "Resource ID of an existing App Service Plan; if none provided, a new ASP will be created"
 }
