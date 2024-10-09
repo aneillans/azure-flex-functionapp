@@ -50,3 +50,13 @@ variable "app_settings" {
   }))
   default = []
 }
+
+variable "cors_allowed_origins" {
+  type = list(string)
+  default = ["*"]
+}
+
+variable "cors_support_credentials" {
+  type    = bool
+  default = false
+}

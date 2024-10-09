@@ -34,6 +34,10 @@ resource "azapi_resource" "linux_flex_function_app" {
           version = var.runtime_version
         }
       },
+      cors = {
+        allowedOrigins = var.cors_allowed_origins,
+        supportCredentials = var.cors_support_credentials
+      },
       siteConfig = {
         appSettings = setunion([
           {
