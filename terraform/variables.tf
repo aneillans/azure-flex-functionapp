@@ -42,3 +42,11 @@ variable "runtime_version" {
   type    = string
   default = "8.0"
 }
+
+variable "app_settings" {
+  type = list(object({
+      name         = string
+      value        = any
+  }))
+  default = []
+}

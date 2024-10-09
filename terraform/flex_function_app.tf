@@ -35,12 +35,11 @@ resource "azapi_resource" "linux_flex_function_app" {
         }
       },
       siteConfig = {
-        appSettings = [
+        appSettings = setunion([
           {
             name  = "AzureWebJobsStorage__accountName",
             value = azurerm_storage_account.storage_account.name
-          }
-        ]
+          }], var.app_settings)
       }
     }
   })
