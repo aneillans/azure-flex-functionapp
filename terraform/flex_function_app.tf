@@ -78,19 +78,19 @@ resource "azapi_resource" "linux_flex_function_app" {
         runtimeVersion = var.auth_runtime_version
       },
       identityProviders = {
-        var.auth_identity_provider = {
+        "OpenIDAuth" = {
           enabled = "true",
           registration = {
-            clientId = "",
+            clientId = var.auth_client_id,
             clientCredential = {
-              clientSecretSettingName = ""
+              clientSecretSettingName = var.auth_client_secret_setting_name
             },
             openIdConnectConfiguration = {
-              authorizationEndpoint = "",
-              tokenEndpoint = "",
-              issuer = "",
-              certificationUri = "",
-              wellKnownOpenIdConfiguration = ""
+              authorizationEndpoint = var.auth_openid_auth_endpoint,
+              tokenEndpoint = var.auth_openid_token_endpoint,
+              issuer = var.auth_openid_issuer,
+              certificationUri = var.auth_openid_certification_uri,
+              wellKnownOpenIdConfiguration = var.auth_openid_well_known_configuration
             }
           }
         }
