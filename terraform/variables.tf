@@ -61,10 +61,6 @@ variable "cors_support_credentials" {
   default = false
 }
 
-variable "auth_redirect_to_provider" {
-  type = string
-}
-
 variable "auth_require_authentication" {
   type = bool
 }

@@ -60,7 +60,7 @@ resource "azapi_resource" "flex_function_authsettings" {
     kind = "string",
     properties = {
       globalValidation = {
-        redirectToProvider = var.auth_redirect_to_provider,
+        redirectToProvider = "OpenIDAuth",
         requireAuthentication = var.auth_require_authentication,
         unauthentedClientAction = var.auth_unauthentication_action
       },
