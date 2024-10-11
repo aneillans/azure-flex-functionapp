@@ -50,7 +50,7 @@ resource "azapi_resource" "linux_flex_function_app" {
   depends_on = [azapi_resource.server_farm_plan, azurerm_storage_account.storage_account]
 }
 
-resource "azapi_resource" "linux_flex_function_app" {
+resource "azapi_resource" "flex_function_authsettings" {
   type                      = "Microsoft.Web/sites/config@2023-12-01"
   schema_validation_enabled = false
   location                  = var.location
