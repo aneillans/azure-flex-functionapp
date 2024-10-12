@@ -51,7 +51,7 @@ resource "azapi_resource" "linux_flex_function_app" {
 }
 
 resource "azapi_resource" "flex_function_authsettings" {
-  type                      = "Microsoft.Web/sites/config"
+  type                      = "Microsoft.Web/sites/config@2018-11-01"
   schema_validation_enabled = false
   location                  = var.location
   name                      = "authsettingsV2"
