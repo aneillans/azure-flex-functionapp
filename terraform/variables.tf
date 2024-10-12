@@ -70,7 +70,8 @@ variable "auth_unauthentication_action" {
 }
 
 variable "auth_forward_proxy_convention" {
-  type = string
+  type    = string
+  default = "NoProxy"
 }
 
 variable "auth_require_https" {
@@ -79,7 +80,7 @@ variable "auth_require_https" {
 
 variable "auth_http_route_api_prefix" {
   type    = string
-  default = "/api"
+  default = "/.auth"
 }
 
 variable "auth_enabled" {
@@ -97,22 +98,6 @@ variable "auth_client_id" {
 }
 
 variable "auth_client_secret_setting_name" {
-  type = string
-}
-
-variable "auth_openid_auth_endpoint" {
-  type = string
-}
-
-variable "auth_openid_token_endpoint" {
-  type = string
-}
-
-variable "auth_openid_issuer" {
-  type = string
-}
-
-variable "auth_openid_certification_uri" {
   type = string
 }
 

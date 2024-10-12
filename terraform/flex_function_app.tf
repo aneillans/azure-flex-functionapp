@@ -51,13 +51,12 @@ resource "azapi_resource" "linux_flex_function_app" {
 }
 
 resource "azapi_resource" "flex_function_authsettings" {
-  type                      = "Microsoft.Web/sites/config@2023-12-01"
+  type                      = "Microsoft.Web/sites/config"
   schema_validation_enabled = false
   location                  = var.location
   name                      = "authsettingsV2"
   parent_id                 = azapi_resource.linux_flex_function_app.id
   body = jsonencode({
-    kind = "string",
     properties = {
       globalValidation = {
         redirectToProvider = "OpenIDAuth",
@@ -77,23 +76,60 @@ resource "azapi_resource" "flex_function_authsettings" {
         enabled = var.auth_enabled,
         runtimeVersion = var.auth_runtime_version
       },
+      login = {
+          tokenStore = {
+              enabled = true,
+              tokenRefreshExtensionHours = 72.0,
+          },
+          preserveUrlFragmentsForLogins = false,
+          cookieExpiration = {
+              convention = "FixedTime",
+              timeToExpiration = "08:00:00"
+          },
+          nonce = {
+              validateNonce = true,
+              nonceExpirationInterval = "00:05:00"
+          }
+      },
       identityProviders = {
-        "OpenIDAuth" = {
-          enabled = "true",
-          registration = {
-            clientId = var.auth_client_id,
-            clientCredential = {
-              clientSecretSettingName = var.auth_client_secret_setting_name
-            },
-            openIdConnectConfiguration = {
-              authorizationEndpoint = var.auth_openid_auth_endpoint,
-              tokenEndpoint = var.auth_openid_token_endpoint,
-              issuer = var.auth_openid_issuer,
-              certificationUri = var.auth_openid_certification_uri,
-              wellKnownOpenIdConfiguration = var.auth_openid_well_known_configuration
+        azureActiveDirectory = {
+              enabled = true,
+              login = {
+                disableWWWAuthenticate = false
+              }
+          },
+          facebook = {
+              enabled = true
+          },
+          gitHub = {
+              enabled = true
+          },
+          google = {
+              enabled = true
+          },
+          twitter = {
+              enabled = true
+          },
+          legacyMicrosoftAccount = {
+              enabled = true
+          },
+          apple = {
+              enabled = true
+          },
+          customOpenIdConnectProviders = {
+            "OpenIDAuth" = {
+              enabled = "true",
+              registration = {
+                clientId = var.auth_client_id,
+                clientCredential = {
+                  clientSecretSettingName = var.auth_client_secret_setting_name
+                },
+                openIdConnectConfiguration = {
+                  wellKnownOpenIdConfiguration = var.auth_openid_well_known_configuration
+                }
+              }
             }
           }
-        }
       }
     }
   })
