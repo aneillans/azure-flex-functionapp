@@ -104,3 +104,23 @@ variable "auth_client_secret_setting_name" {
 variable "auth_openid_well_known_configuration" {
   type = string
 }
+
+variable "auth_login_token_store_enabled" { 
+  type    = bool
+  default = true
+}
+
+variable "auth_login_token_refresh_hours" {
+  type    = number
+  default = 72
+}
+
+variable "auth_login_validate_nonce" {
+  type    = bool
+  default = true
+}
+
+variable "auth_login_logout_endpoint" {
+  type    = string
+  default = "/.auth/logout"
+}

@@ -78,8 +78,8 @@ resource "azapi_resource" "flex_function_authsettings" {
       },
       login = {
           tokenStore = {
-              enabled = true,
-              tokenRefreshExtensionHours = 72.0,
+              enabled = var.auth_login_token_store_enabled,
+              tokenRefreshExtensionHours = var.auth_login_token_refresh_hours,
           },
           preserveUrlFragmentsForLogins = false,
           cookieExpiration = {
@@ -87,8 +87,11 @@ resource "azapi_resource" "flex_function_authsettings" {
               timeToExpiration = "08:00:00"
           },
           nonce = {
-              validateNonce = true,
+              validateNonce = var.auth_login_validate_nonce,
               nonceExpirationInterval = "00:05:00"
+          },
+          routes = {
+            logoutEndpoint = var.auth_login_logout_endpoint
           }
       },
       identityProviders = {
