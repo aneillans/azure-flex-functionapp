@@ -50,12 +50,11 @@ resource "azapi_resource" "linux_flex_function_app" {
   depends_on = [azapi_resource.server_farm_plan, azurerm_storage_account.storage_account]
 }
 
-resource "azapi_resource" "flex_function_authsettings" {
-  type                      = "Microsoft.Web/sites/config@2018-11-01"
-  schema_validation_enabled = false
-  location                  = var.location
+resource "azapi_update_resource" "flex_function_authsettings" {
+  type                      = "Microsoft.Web/sites/config@2022-03-01"
   name                      = "authsettingsV2"
-  parent_id                 = azapi_resource.linux_flex_function_app.id
+  resource_id               = "${azapi_resource.linux_flex_function_app.id}/config/authsettingsV2"
+
   body = jsonencode({
     properties = {
       globalValidation = {
