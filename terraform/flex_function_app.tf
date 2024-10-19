@@ -52,7 +52,6 @@ resource "azapi_resource" "linux_flex_function_app" {
 
 resource "azapi_update_resource" "flex_function_authsettings" {
   type                      = "Microsoft.Web/sites/config@2022-03-01"
-  name                      = "authsettingsV2"
   resource_id               = "${azapi_resource.linux_flex_function_app.id}/config/authsettingsV2"
 
   body = jsonencode({
