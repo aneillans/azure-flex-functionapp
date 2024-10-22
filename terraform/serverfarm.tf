@@ -5,7 +5,8 @@ resource "azapi_resource" "server_farm_plan" {
   location                  = var.location
   name                      = var.plan_name
   parent_id                 = var.resource_group_id
-  body = jsonencode({
+
+  body = {
     kind = "functionapp",
     sku = {
       tier = "FlexConsumption",
@@ -14,5 +15,5 @@ resource "azapi_resource" "server_farm_plan" {
     properties = {
       reserved = true
     }
-  })
+  }
 }

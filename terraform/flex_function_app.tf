@@ -8,7 +8,7 @@ resource "azapi_resource" "linux_flex_function_app" {
   location                  = var.location
   name                      = var.function_app_name
   parent_id                 = var.resource_group_id
-  body = jsonencode({
+  body = {
     kind = "functionapp,linux",
     identity = {
       type : "SystemAssigned"
@@ -46,7 +46,7 @@ resource "azapi_resource" "linux_flex_function_app" {
           }], var.app_settings)
       }
     }
-  })
+  }
   depends_on = [azapi_resource.server_farm_plan, azurerm_storage_account.storage_account]
 }
 
