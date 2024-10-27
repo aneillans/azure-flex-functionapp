@@ -23,8 +23,8 @@ variable "resource_group_id" {
 }
 
 variable "max_instance_count" {
-  type    = string
-  default = "100"
+  type    = number
+  default = 100
 }
 
 variable "instance_memory" {

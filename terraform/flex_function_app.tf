@@ -18,10 +18,10 @@ resource "azapi_resource" "linux_flex_function_app" {
       functionAppConfig = {
         deployment = {
           storage = {
-            type  = "blobContainer",
+            type  = "blobcontainer",
             value = local.deploymentContainer,
             authentication = {
-              type = "SystemAssignedIdentity"
+              type = "systemassignedidentity"
             }
           }
         },
@@ -119,7 +119,7 @@ resource "azapi_update_resource" "flex_function_authsettings" {
           },
           customOpenIdConnectProviders = {
             "OpenIDAuth" = {
-              enabled = "true",
+              enabled = true,
               registration = {
                 clientId = var.auth_client_id,
                 clientCredential = {
