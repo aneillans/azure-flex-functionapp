@@ -49,7 +49,6 @@ resource "azapi_resource" "linux_flex_function_app" {
   }
   depends_on             = [azapi_resource.server_farm_plan, azurerm_storage_account.storage_account]
   response_export_values = ["*"]
-  ignore_changes         = [ body.properties.deployment ]
 }
 
 resource "azapi_update_resource" "flex_function_authsettings" {
