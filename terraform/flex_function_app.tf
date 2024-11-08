@@ -52,7 +52,7 @@ resource "azapi_resource" "linux_flex_function_app" {
   response_export_values = [ "properties.defaultHostName", "properties.enabledHostNames", "properties.httpsOnly", "identity.principalId" ]
 }
 
-resource "azapi_update_resource" "flex_function_authsettings_v2" {
+resource "azapi_update_resource" "flex_function_authsettings" {
   type          = "Microsoft.Web/sites/config@2022-03-01"
   resource_id   = "${azapi_resource.linux_flex_function_app.id}/config/authsettings"
   ignore_casing = true
