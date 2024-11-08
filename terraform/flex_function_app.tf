@@ -54,7 +54,7 @@ resource "azapi_resource" "linux_flex_function_app" {
 
 resource "azapi_update_resource" "flex_function_authsettings" {
   type          = "Microsoft.Web/sites/config@2022-03-01"
-  resource_id   = "${azapi_resource.linux_flex_function_app.id}/config/authsettings"
+  resource_id   = "${azapi_resource.linux_flex_function_app.id}/config/authsettingsv2"
   ignore_casing = true
   body = {
     properties = {
