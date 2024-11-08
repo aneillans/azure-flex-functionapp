@@ -51,9 +51,9 @@ resource "azapi_resource" "linux_flex_function_app" {
   response_export_values = ["*"]
 }
 
-resource "azapi_update_resource" "flex_function_authsettings" {
+resource "azapi_update_resource" "flex_function_authsettings_v2" {
   type                      = "Microsoft.Web/sites/config@2022-03-01"
-  resource_id               = "${azapi_resource.linux_flex_function_app.id}/config/authsettingsV2"
+  resource_id               = "${azapi_resource.linux_flex_function_app.id}/config/authsettings"
 
   body = {
     properties = {
@@ -81,6 +81,7 @@ resource "azapi_update_resource" "flex_function_authsettings" {
               tokenRefreshExtensionHours = var.auth_login_token_refresh_hours,
           },
           preserveUrlFragmentsForLogins = false,
+          allowedExternalRedirectUrls = [],
           cookieExpiration = {
               convention = "FixedTime",
               timeToExpiration = "08:00:00"
@@ -96,8 +97,15 @@ resource "azapi_update_resource" "flex_function_authsettings" {
       identityProviders = {
         azureActiveDirectory = {
               enabled = true,
+              registration = {},
               login = {
                 disableWWWAuthenticate = false
+              },
+              validation = {
+                jwtClaimChecks = {},
+                defaultAuthorizationPolicy = {
+                  allowedPrincipals = {}
+                }
               }
           },
           facebook = {
@@ -132,7 +140,8 @@ resource "azapi_update_resource" "flex_function_authsettings" {
               }
             }
           }
-      }
+      },
+      clearInboundClaimsMapping = false
     }
   }
 }
