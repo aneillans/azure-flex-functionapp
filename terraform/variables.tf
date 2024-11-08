@@ -45,8 +45,8 @@ variable "runtime_version" {
 
 variable "app_settings" {
   type = list(object({
-      name         = string
-      value        = any
+    name  = string
+    value = any
   }))
   default = []
 }
@@ -105,7 +105,7 @@ variable "auth_openid_well_known_configuration" {
   type = string
 }
 
-variable "auth_login_token_store_enabled" { 
+variable "auth_login_token_store_enabled" {
   type    = bool
   default = true
 }

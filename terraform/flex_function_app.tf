@@ -8,6 +8,7 @@ resource "azapi_resource" "linux_flex_function_app" {
   location                  = var.location
   name                      = var.function_app_name
   parent_id                 = var.resource_group_id
+  ignore_casing             = true
   body = {
     kind = "functionapp,linux",
     identity = {
@@ -35,7 +36,7 @@ resource "azapi_resource" "linux_flex_function_app" {
         }
       },
       cors = {
-        allowedOrigins = var.cors_allowed_origins,
+        allowedOrigins     = var.cors_allowed_origins,
         supportCredentials = var.cors_support_credentials
       },
       siteConfig = {
@@ -43,7 +44,7 @@ resource "azapi_resource" "linux_flex_function_app" {
           {
             name  = "AzureWebJobsStorage__accountName",
             value = azurerm_storage_account.storage_account.name
-          }], var.app_settings)
+        }], var.app_settings)
       }
     }
   }
@@ -52,14 +53,14 @@ resource "azapi_resource" "linux_flex_function_app" {
 }
 
 resource "azapi_update_resource" "flex_function_authsettings_v2" {
-  type                      = "Microsoft.Web/sites/config@2022-03-01"
-  resource_id               = "${azapi_resource.linux_flex_function_app.id}/config/authsettings"
-
+  type          = "Microsoft.Web/sites/config@2022-03-01"
+  resource_id   = "${azapi_resource.linux_flex_function_app.id}/config/authsettings"
+  ignore_casing = true
   body = {
     properties = {
       globalValidation = {
-        redirectToProvider = "OpenIDAuth",
-        requireAuthentication = var.auth_require_authentication,
+        redirectToProvider      = "OpenIDAuth",
+        requireAuthentication   = var.auth_require_authentication,
         unauthentedClientAction = var.auth_unauthentication_action
       },
       httpSettings = {
@@ -72,74 +73,74 @@ resource "azapi_update_resource" "flex_function_authsettings_v2" {
         }
       },
       platform = {
-        enabled = var.auth_enabled,
+        enabled        = var.auth_enabled,
         runtimeVersion = var.auth_runtime_version
       },
       login = {
-          tokenStore = {
-              enabled = var.auth_login_token_store_enabled,
-              tokenRefreshExtensionHours = var.auth_login_token_refresh_hours,
-          },
-          preserveUrlFragmentsForLogins = false,
-          allowedExternalRedirectUrls = [],
-          cookieExpiration = {
-              convention = "FixedTime",
-              timeToExpiration = "08:00:00"
-          },
-          nonce = {
-              validateNonce = var.auth_login_validate_nonce,
-              nonceExpirationInterval = "00:05:00"
-          },
-          routes = {
-            logoutEndpoint = var.auth_login_logout_endpoint
-          }
+        tokenStore = {
+          enabled                    = var.auth_login_token_store_enabled,
+          tokenRefreshExtensionHours = var.auth_login_token_refresh_hours,
+        },
+        preserveUrlFragmentsForLogins = false,
+        allowedExternalRedirectUrls   = [],
+        cookieExpiration = {
+          convention       = "FixedTime",
+          timeToExpiration = "08:00:00"
+        },
+        nonce = {
+          validateNonce           = var.auth_login_validate_nonce,
+          nonceExpirationInterval = "00:05:00"
+        },
+        routes = {
+          logoutEndpoint = var.auth_login_logout_endpoint
+        }
       },
       identityProviders = {
         azureActiveDirectory = {
-              enabled = true,
-              registration = {},
-              login = {
-                disableWWWAuthenticate = false
+          enabled      = true,
+          registration = {},
+          login = {
+            disableWWWAuthenticate = false
+          },
+          validation = {
+            jwtClaimChecks = {},
+            defaultAuthorizationPolicy = {
+              allowedPrincipals = {}
+            }
+          }
+        },
+        facebook = {
+          enabled = true
+        },
+        gitHub = {
+          enabled = true
+        },
+        google = {
+          enabled = true
+        },
+        twitter = {
+          enabled = true
+        },
+        legacyMicrosoftAccount = {
+          enabled = true
+        },
+        apple = {
+          enabled = true
+        },
+        customOpenIdConnectProviders = {
+          "OpenIDAuth" = {
+            enabled = true,
+            registration = {
+              clientId = var.auth_client_id,
+              clientCredential = {
+                clientSecretSettingName = var.auth_client_secret_setting_name
               },
-              validation = {
-                jwtClaimChecks = {},
-                defaultAuthorizationPolicy = {
-                  allowedPrincipals = {}
-                }
-              }
-          },
-          facebook = {
-              enabled = true
-          },
-          gitHub = {
-              enabled = true
-          },
-          google = {
-              enabled = true
-          },
-          twitter = {
-              enabled = true
-          },
-          legacyMicrosoftAccount = {
-              enabled = true
-          },
-          apple = {
-              enabled = true
-          },
-          customOpenIdConnectProviders = {
-            "OpenIDAuth" = {
-              enabled = true,
-              registration = {
-                clientId = var.auth_client_id,
-                clientCredential = {
-                  clientSecretSettingName = var.auth_client_secret_setting_name
-                },
-                openIdConnectConfiguration = {
-                  wellKnownOpenIdConfiguration = var.auth_openid_well_known_configuration
-                }
+              openIdConnectConfiguration = {
+                wellKnownOpenIdConfiguration = var.auth_openid_well_known_configuration
               }
             }
           }
+        }
       },
       clearInboundClaimsMapping = false
     }
