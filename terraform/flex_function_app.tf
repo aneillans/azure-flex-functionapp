@@ -142,7 +142,7 @@ resource "azapi_update_resource" "flex_function_authsettings" {
           }
         }
       },
-      clearInboundClaimsMapping = false
+      clearInboundClaimsMapping = "false"
     }
   }
 }
