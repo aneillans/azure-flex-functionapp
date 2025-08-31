@@ -3,7 +3,7 @@ resource "azurerm_storage_account" "storage_account" {
   resource_group_name      = var.resource_group_name
   location                 = var.location
   account_tier             = "Standard"
-  account_replication_type = "LRS"
+  account_replication_type = var.storage_account_replication_type
 }
 
 resource "azurerm_storage_container" "deployment_container" {
@@ -22,4 +22,5 @@ resource "azurerm_role_assignment" "storage_roleassignment" {
 data "azurerm_linux_function_app" "function_wrapper" {
   name                = azapi_resource.linux_flex_function_app.name
   resource_group_name = var.resource_group_name
+  depends_on          = [azapi_resource.linux_flex_function_app]
 }

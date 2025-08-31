@@ -11,7 +11,8 @@ output "app_service_plan_id" {
 }
 
 output "identity_id" {
-  value = data.azurerm_linux_function_app.function_wrapper.identity[0].principal_id
+  value     = data.azurerm_linux_function_app.function_wrapper.identity[0].principal_id
+  sensitive = true
 }
 
 output "default_hostname" {
