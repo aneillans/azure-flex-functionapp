@@ -1,3 +1,4 @@
+
 locals {
   deploymentContainer = "${azurerm_storage_account.storage_account.primary_blob_endpoint}deploymentpackage"
 }
@@ -49,11 +50,25 @@ resource "azapi_resource" "linux_flex_function_app" {
     }
   }
   depends_on             = [azapi_resource.server_farm_plan, azurerm_storage_account.storage_account]
-  response_export_values = [ "properties.defaultHostName", "properties.enabledHostNames", "properties.httpsOnly", "identity.principalId" ]
+  response_export_values = ["properties.defaultHostName", "properties.enabledHostNames", "properties.httpsOnly", "identity.principalId"]
+}
+
+resource "azapi_update_resource" "flex_function_cors" {
+  type        = "Microsoft.Web/sites/config@2023-12-01"
+  resource_id = "${azapi_resource.linux_flex_function_app.id}/config/web"
+  body = {
+    properties = {
+      cors = {
+        allowedOrigins     = var.cors_allowed_origins
+        supportCredentials = var.cors_support_credentials
+      }
+    }
+  }
+  depends_on = [azapi_resource.linux_flex_function_app]
 }
 
 resource "azapi_update_resource" "flex_function_authsettings" {
-  type          = "Microsoft.Web/sites/config@2022-03-01"
+  type          = "Microsoft.Web/sites/config@2023-12-01"
   resource_id   = "${azapi_resource.linux_flex_function_app.id}/config/authsettingsv2"
   ignore_casing = true
   body = {
