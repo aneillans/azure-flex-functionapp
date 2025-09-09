@@ -16,7 +16,7 @@ resource "azapi_resource" "linux_flex_function_app" {
       type : "SystemAssigned"
     }
     properties = {
-      serverFarmId = azapi_resource.server_farm_plan.id,
+      serverFarmId = azurerm_service_plan.server_farm.id,
       functionAppConfig = {
         deployment = {
           storage = {
@@ -49,7 +49,7 @@ resource "azapi_resource" "linux_flex_function_app" {
       }
     }
   }
-  depends_on             = [azapi_resource.server_farm_plan, azurerm_storage_account.storage_account]
+  depends_on             = [azurerm_service_plan.server_farm, azurerm_storage_account.storage_account]
   response_export_values = ["properties.defaultHostName", "properties.enabledHostNames", "properties.httpsOnly", "identity.principalId"]
 }
 
