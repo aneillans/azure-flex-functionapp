@@ -37,88 +37,84 @@ jobs:
         with:
           dotnet-version: '7.0.x'
 
-      - name: Install zip and download Inedo Upack CLI
+      - name: Install packaging prerequisites
         run: |
           sudo apt-get update
           sudo apt-get install -y zip curl tar unzip file
 
-          set -e
+      - name: Download and install Inedo Upack CLI
+        id: install-upack
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $apiUrl = 'https://api.github.com/repos/Inedo/upack/releases/latest'
+          Write-Host "Querying $apiUrl"
+          $release = Invoke-RestMethod -Uri $apiUrl -UseBasicParsing
+          if (-not $release.assets) {
+            throw "Failed to find assets in upack release metadata."
+          }
 
-          # Query GitHub Releases API to find the latest release asset suitable for Linux x64
-          echo "Querying GitHub Releases API for Inedo/upack latest release"
-          API_JSON=$(curl -sS "https://api.github.com/repos/Inedo/upack/releases/latest")
+          function Get-AssetScore([string]$name) {
+            if (-not $name) { return 0 }
+            $n = $name.ToLower()
+            $score = 0
+            if ($n -match 'linux') { $score += 10 }
+            if ($n -match 'x64' -or $n -match 'x86_64' -or $n -match '64') { $score += 5 }
+            if ($n -like '*.tar.gz' -or $n -like '*.tgz') { $score += 3 }
+            if ($n -like '*.zip') { $score += 2 }
+            return $score
+          }
 
-          if [ -z "$API_JSON" ]; then
-            echo "Failed to fetch release metadata from GitHub API"
-            exit 1
-          fi
+          $asset = $release.assets |
+            Sort-Object @{ Expression = { Get-AssetScore $_.name }; Descending = $true } |
+            Select-Object -First 1
 
-          # Use Python to pick an asset: prefer name containing 'linux' and 'x64' (or '64'), prefer .tar.gz then .zip
-          DOWNLOAD_URL=$(echo "$API_JSON" | python3 - <<'PY'
-import json,sys,re
-data=json.load(sys.stdin)
-assets=data.get('assets',[])
-def score(a):
-    n=a.get('name','').lower()
-    s=0
-    if 'linux' in n: s+=10
-    if 'x64' in n or 'x86_64' in n or '64' in n: s+=5
-    if n.endswith('.tar.gz'): s+=3
-    if n.endswith('.zip'): s+=2
-    return s
-best=None
-best_score=-1
-for a in assets:
-    s=score(a)
-    if s>best_score:
-        best_score=s
-        best=a
-if best:
-    print(best.get('browser_download_url'))
-else:
-    # fallback: select first asset
-    if assets:
-        print(assets[0].get('browser_download_url'))
-    else:
-        sys.exit(2)
-PY
-)
+          if (-not $asset -or -not $asset.browser_download_url) {
+            throw "Unable to determine a suitable upack asset to download."
+          }
 
-          if [ -z "$DOWNLOAD_URL" ]; then
-            echo "Could not determine an asset download URL from GitHub releases"
-            exit 1
-          fi
+          $downloadUrl = $asset.browser_download_url
+          $tempDir = Join-Path $env:RUNNER_TEMP 'upack'
+          New-Item -ItemType Directory -Force -Path $tempDir | Out-Null
+          $assetPath = Join-Path $tempDir $asset.name
 
-          echo "Downloading upack from $DOWNLOAD_URL"
-          curl -sSLf "$DOWNLOAD_URL" -o upack_asset
+          Write-Host "Downloading upack from $downloadUrl"
+          Invoke-WebRequest -Uri $downloadUrl -OutFile $assetPath -UseBasicParsing
 
-          FILETYPE=$(file -b --mime-type upack_asset || true)
-          echo "Downloaded file MIME type: $FILETYPE"
+          $extractDir = Join-Path $tempDir 'extract'
+          New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
 
-          if [[ "$FILETYPE" == "application/gzip" ]] || [[ "$FILETYPE" == "application/x-gzip" ]]; then
-            tar -xzf upack_asset
-          elif [[ "$FILETYPE" == "application/zip" ]]; then
-            unzip -q upack_asset
-          else
-            chmod +x upack_asset || true
-          fi
+          $nameLower = ($asset.name ?? '').ToLower()
+          if ($nameLower -like '*.tar.gz' -or $nameLower -like '*.tgz') {
+            & tar -xzf $assetPath -C $extractDir
+          }
+          elseif ($nameLower -like '*.zip') {
+            Expand-Archive -Path $assetPath -DestinationPath $extractDir -Force
+          }
+          else {
+            Copy-Item $assetPath (Join-Path $extractDir 'upack') -Force
+          }
 
-          UPACK_BIN=$(find . -type f -name upack -perm /a+x -print -quit || true)
-          if [ -z "$UPACK_BIN" ] && [ -x "upack_asset" ]; then
-            UPACK_BIN="./upack_asset"
-          fi
+          $binary = Get-ChildItem -Path $extractDir -Recurse -File |
+            Where-Object { $_.Name -eq 'upack' } |
+            Select-Object -First 1
 
-          if [ -z "$UPACK_BIN" ]; then
-            echo "Error: upack executable not found after extraction"
-            ls -la
-            exit 1
-          fi
+          if (-not $binary) {
+            $binary = Get-Item $assetPath -ErrorAction SilentlyContinue
+          }
 
-          sudo mv "$UPACK_BIN" /usr/local/bin/upack
-          sudo chmod +x /usr/local/bin/upack
+          if (-not $binary) {
+            throw "upack executable not found after extracting the asset."
+          }
 
-          echo "Installed upack to /usr/local/bin/upack"
-          /usr/local/bin/upack --version || true
+          $destination = '/usr/local/bin/upack'
+          sudo mv "$($binary.FullName)" $destination
+          sudo chmod +x $destination
+
+          $version = & $destination --version
+          Write-Host "Installed upack ($version)"
+
+          "upack-path=$destination" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
       - name: Determine version
         id: version
@@ -203,6 +199,7 @@ PY
       - name: Publish to ProGet using Inedo Upack CLI
         env:
           PACKAGE_PATH: ${{ steps.build.outputs.package_name }}
+          UPACK_PATH: ${{ steps.install-upack.outputs.upack-path }}
         run: |
           VERSION=${{ steps.version.outputs.version }}
 
@@ -213,15 +210,17 @@ PY
 
           echo "Publishing ${PACKAGE_PATH} to ProGet via Inedo Upack CLI..."
 
-          # Locate upack CLI (prefer system install at /usr/local/bin/upack)
-          if [ -x "/usr/local/bin/upack" ]; then
+          # Locate upack CLI (prefer the path from the install step)
+          if [ -n "$UPACK_PATH" ] && [ -x "$UPACK_PATH" ]; then
+            UPACK_CMD="$UPACK_PATH"
+          elif [ -x "/usr/local/bin/upack" ]; then
             UPACK_CMD="/usr/local/bin/upack"
           elif [ -x "$HOME/.dotnet/tools/upack" ]; then
             UPACK_CMD="$HOME/.dotnet/tools/upack"
           elif command -v upack >/dev/null 2>&1; then
             UPACK_CMD="$(command -v upack)"
           else
-            echo "Error: upack CLI not found (tried /usr/local/bin/upack and $HOME/.dotnet/tools/upack)"
+            echo "Error: upack CLI not found (checked UPACK_PATH env, /usr/local/bin/upack, $HOME/.dotnet/tools/upack, and PATH)"
             exit 1
           fi
 
