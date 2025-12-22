@@ -54,6 +54,11 @@ jobs:
             throw "Failed to find assets in upack release metadata."
           }
 
+          $candidateAssets = $release.assets | Where-Object { $_.name -notmatch 'musl' }
+          if (-not $candidateAssets) {
+            $candidateAssets = $release.assets
+          }
+
           function Get-AssetScore([string]$name) {
             if (-not $name) { return 0 }
             $n = $name.ToLower()
@@ -65,7 +70,7 @@ jobs:
             return $score
           }
 
-          $asset = $release.assets |
+          $asset = $candidateAssets |
             Sort-Object @{ Expression = { Get-AssetScore $_.name }; Descending = $true } |
             Select-Object -First 1
 
@@ -110,6 +115,10 @@ jobs:
           $destination = '/usr/local/bin/upack'
           sudo mv "$($binary.FullName)" $destination
           sudo chmod +x $destination
+
+          if (-not (Test-Path $destination)) {
+            throw "upack binary missing after installation at $destination"
+          }
 
           $version = & $destination --version
           Write-Host "Installed upack ($version)"
