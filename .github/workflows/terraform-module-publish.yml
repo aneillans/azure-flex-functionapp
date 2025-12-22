@@ -40,20 +40,76 @@ jobs:
       - name: Install zip and download Inedo Upack CLI
         run: |
           sudo apt-get update
-          sudo apt-get install -y zip curl tar
+          sudo apt-get install -y zip curl tar unzip file
 
-          # Try to download the official upack Linux x64 release and install to /usr/local/bin
           set -e
-          UPACK_ASSET_URL="https://github.com/Inedo/upack/releases/latest/download/upack-linux-x64.tar.gz"
-          echo "Downloading upack from ${UPACK_ASSET_URL}"
-          curl -sL "$UPACK_ASSET_URL" -o upack.tar.gz
 
-          tar -xzf upack.tar.gz
+          # Query GitHub Releases API to find the latest release asset suitable for Linux x64
+          echo "Querying GitHub Releases API for Inedo/upack latest release"
+          API_JSON=$(curl -sS "https://api.github.com/repos/Inedo/upack/releases/latest")
 
-          # Find the extracted upack executable and move it into /usr/local/bin
-          UPACK_BIN=$(find . -type f -name upack -print -quit || true)
+          if [ -z "$API_JSON" ]; then
+            echo "Failed to fetch release metadata from GitHub API"
+            exit 1
+          fi
+
+          # Use Python to pick an asset: prefer name containing 'linux' and 'x64' (or '64'), prefer .tar.gz then .zip
+          DOWNLOAD_URL=$(echo "$API_JSON" | python3 - <<'PY'
+import json,sys,re
+data=json.load(sys.stdin)
+assets=data.get('assets',[])
+def score(a):
+    n=a.get('name','').lower()
+    s=0
+    if 'linux' in n: s+=10
+    if 'x64' in n or 'x86_64' in n or '64' in n: s+=5
+    if n.endswith('.tar.gz'): s+=3
+    if n.endswith('.zip'): s+=2
+    return s
+best=None
+best_score=-1
+for a in assets:
+    s=score(a)
+    if s>best_score:
+        best_score=s
+        best=a
+if best:
+    print(best.get('browser_download_url'))
+else:
+    # fallback: select first asset
+    if assets:
+        print(assets[0].get('browser_download_url'))
+    else:
+        sys.exit(2)
+PY
+)
+
+          if [ -z "$DOWNLOAD_URL" ]; then
+            echo "Could not determine an asset download URL from GitHub releases"
+            exit 1
+          fi
+
+          echo "Downloading upack from $DOWNLOAD_URL"
+          curl -sSLf "$DOWNLOAD_URL" -o upack_asset
+
+          FILETYPE=$(file -b --mime-type upack_asset || true)
+          echo "Downloaded file MIME type: $FILETYPE"
+
+          if [[ "$FILETYPE" == "application/gzip" ]] || [[ "$FILETYPE" == "application/x-gzip" ]]; then
+            tar -xzf upack_asset
+          elif [[ "$FILETYPE" == "application/zip" ]]; then
+            unzip -q upack_asset
+          else
+            chmod +x upack_asset || true
+          fi
+
+          UPACK_BIN=$(find . -type f -name upack -perm /a+x -print -quit || true)
+          if [ -z "$UPACK_BIN" ] && [ -x "upack_asset" ]; then
+            UPACK_BIN="./upack_asset"
+          fi
+
           if [ -z "$UPACK_BIN" ]; then
-            echo "Error: upack binary not found in archive"
+            echo "Error: upack executable not found after extraction"
             ls -la
             exit 1
           fi
@@ -62,7 +118,7 @@ jobs:
           sudo chmod +x /usr/local/bin/upack
 
           echo "Installed upack to /usr/local/bin/upack"
-          upack --version || true
+          /usr/local/bin/upack --version || true
 
       - name: Determine version
         id: version
@@ -157,11 +213,15 @@ jobs:
 
           echo "Publishing ${PACKAGE_PATH} to ProGet via Inedo Upack CLI..."
 
-          # Push package using upack CLI installed as a dotnet global tool
-          UPACK_CMD="$HOME/.dotnet/tools/upack"
-
-          if [ ! -x "$UPACK_CMD" ]; then
-            echo "Error: upack CLI not found at $UPACK_CMD"
+          # Locate upack CLI (prefer system install at /usr/local/bin/upack)
+          if [ -x "/usr/local/bin/upack" ]; then
+            UPACK_CMD="/usr/local/bin/upack"
+          elif [ -x "$HOME/.dotnet/tools/upack" ]; then
+            UPACK_CMD="$HOME/.dotnet/tools/upack"
+          elif command -v upack >/dev/null 2>&1; then
+            UPACK_CMD="$(command -v upack)"
+          else
+            echo "Error: upack CLI not found (tried /usr/local/bin/upack and $HOME/.dotnet/tools/upack)"
             exit 1
           fi
 
