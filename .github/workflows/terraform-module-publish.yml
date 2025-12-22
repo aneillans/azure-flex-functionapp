@@ -32,6 +32,18 @@ jobs:
         with:
           terraform_version: latest
 
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '7.0.x'
+
+      - name: Install zip and Inedo Upack CLI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zip
+          dotnet tool install --global Inedo.Upack || true
+          echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
+
       - name: Determine version
         id: version
         run: |
@@ -57,7 +69,7 @@ jobs:
         id: build
         run: |
           VERSION=${{ steps.version.outputs.version }}
-          PACKAGE_NAME="${MODULE_NAME}-${VERSION}.tar.gz"
+          PACKAGE_NAME="${MODULE_NAME}-${VERSION}.zip"
           
           # Create temporary build directory
           mkdir -p build
@@ -86,9 +98,9 @@ jobs:
           }
           EOF
           
-          # Package the module
+          # Package the module as a zip
           cd build
-          tar -czf ../${PACKAGE_NAME} ${MODULE_NAME}/
+          zip -r ../${PACKAGE_NAME} ${MODULE_NAME}/ > /dev/null
           cd ..
           
           echo "package_name=${PACKAGE_NAME}" >> $GITHUB_OUTPUT
@@ -112,31 +124,34 @@ jobs:
           
           cat module_metadata.json
 
-      - name: Publish to ProGet
+      - name: Publish to ProGet using Inedo Upack CLI
         env:
           PACKAGE_PATH: ${{ steps.build.outputs.package_name }}
         run: |
           VERSION=${{ steps.version.outputs.version }}
-          
+
           if [ -z "$PROGET_SERVER" ] || [ -z "$PROGET_FEED" ] || [ -z "$PROGET_API_KEY" ]; then
             echo "Error: ProGet credentials not configured in secrets"
             exit 1
           fi
-          
-          echo "Publishing ${PACKAGE_PATH} to ProGet..."
-          
-          # Upload package to ProGet using REST API
-          curl -X POST \
-            -H "Authorization: Bearer ${PROGET_API_KEY}" \
-            -H "Content-Type: multipart/form-data" \
-            -F "file=@${PACKAGE_PATH}" \
-            "${PROGET_SERVER}/api/v3/feeds/terraform-modules/package-upload?feed=${PROGET_FEED}" \
-            -v
-          
+
+          echo "Publishing ${PACKAGE_PATH} to ProGet via Inedo Upack CLI..."
+
+          # Push package using upack CLI installed as a dotnet global tool
+          UPACK_CMD="$HOME/.dotnet/tools/upack"
+
+          if [ ! -x "$UPACK_CMD" ]; then
+            echo "Error: upack CLI not found at $UPACK_CMD"
+            exit 1
+          fi
+
+          # Use upack to push the package to the specified server and feed
+          "$UPACK_CMD" push "${PACKAGE_PATH}" --server "${PROGET_SERVER}" --feed "${PROGET_FEED}" --api-key "${PROGET_API_KEY}"
+
           if [ $? -eq 0 ]; then
-            echo "✓ Package published successfully"
+            echo "✓ Package published successfully via upack"
           else
-            echo "✗ Failed to publish package"
+            echo "✗ Failed to publish package via upack"
             exit 1
           fi
 
