@@ -1,0 +1,171 @@
+name: Terraform Module Build and Publish
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'  # Semantic versioning (e.g., v1.0.0)
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g., 1.0.0)'
+        required: true
+        type: string
+
+env:
+  PROGET_SERVER: ${{ secrets.PROGET_SERVER }}
+  PROGET_FEED: ${{ secrets.PROGET_FEED }}
+  PROGET_API_KEY: ${{ secrets.PROGET_API_KEY }}
+  MODULE_NAME: azure-flex-functionapp
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for versioning
+
+      - name: Determine version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            # Extract version from tag (remove 'v' prefix)
+            VERSION=${GITHUB_REF#refs/tags/v}
+          else
+            # Use provided version from workflow dispatch
+            VERSION=${{ github.event.inputs.version }}
+          fi
+          
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Version: ${VERSION}"
+
+      - name: Validate Terraform Module
+        run: |
+          cd terraform
+          terraform init -backend=false
+          terraform validate
+          terraform fmt -check -recursive
+
+      - name: Build module package
+        id: build
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          PACKAGE_NAME="${MODULE_NAME}-${VERSION}.tar.gz"
+          
+          # Create temporary build directory
+          mkdir -p build
+          
+          # Copy terraform files to build directory maintaining structure
+          cp -r terraform/ build/${MODULE_NAME}/
+          
+          # Include README and LICENSE if they exist
+          if [ -f README.md ]; then
+            cp README.md build/${MODULE_NAME}/
+          fi
+          
+          if [ -f LICENSE ]; then
+            cp LICENSE build/${MODULE_NAME}/
+          fi
+          
+          # Create module manifest (Terraform registry compatible)
+          cat > build/${MODULE_NAME}/VERSION << EOF
+          {
+            "version": "${VERSION}",
+            "name": "${MODULE_NAME}",
+            "namespace": "custom",
+            "type": "module",
+            "provider": "azurerm",
+            "source": "proget/custom/${MODULE_NAME}/azurerm"
+          }
+          EOF
+          
+          # Package the module
+          cd build
+          tar -czf ../${PACKAGE_NAME} ${MODULE_NAME}/
+          cd ..
+          
+          echo "package_name=${PACKAGE_NAME}" >> $GITHUB_OUTPUT
+          echo "Package created: ${PACKAGE_NAME}"
+
+      - name: Generate module metadata
+        id: metadata
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          
+          cat > module_metadata.json << EOF
+          {
+            "name": "${MODULE_NAME}",
+            "version": "${VERSION}",
+            "provider": "azurerm",
+            "description": "Azure Flex Consumption Plan Terraform Module",
+            "source": "github.com/your-org/${MODULE_NAME}",
+            "tag": "v${VERSION}"
+          }
+          EOF
+          
+          cat module_metadata.json
+
+      - name: Publish to ProGet
+        env:
+          PACKAGE_PATH: ${{ steps.build.outputs.package_name }}
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          
+          if [ -z "$PROGET_SERVER" ] || [ -z "$PROGET_FEED" ] || [ -z "$PROGET_API_KEY" ]; then
+            echo "Error: ProGet credentials not configured in secrets"
+            exit 1
+          fi
+          
+          echo "Publishing ${PACKAGE_PATH} to ProGet..."
+          
+          # Upload package to ProGet using REST API
+          curl -X POST \
+            -H "Authorization: Bearer ${PROGET_API_KEY}" \
+            -H "Content-Type: multipart/form-data" \
+            -F "file=@${PACKAGE_PATH}" \
+            "${PROGET_SERVER}/api/v3/feeds/terraform-modules/package-upload?feed=${PROGET_FEED}" \
+            -v
+          
+          if [ $? -eq 0 ]; then
+            echo "✓ Package published successfully"
+          else
+            echo "✗ Failed to publish package"
+            exit 1
+          fi
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: ${{ steps.build.outputs.package_name }}
+          body: |
+            # Terraform Module Release: ${{ steps.version.outputs.version }}
+            
+            ## Module Details
+            - **Name**: ${{ env.MODULE_NAME }}
+            - **Version**: ${{ steps.version.outputs.version }}
+            - **Provider**: azurerm
+            
+            ## Published to ProGet
+            Feed: ${{ env.PROGET_FEED }}
+            
+            ## Installation
+            See README.md for installation instructions.
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish workflow summary
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## Terraform Module Published ✓
+          
+          - **Module**: ${{ env.MODULE_NAME }}
+          - **Version**: ${{ steps.version.outputs.version }}
+          - **Package**: ${{ steps.build.outputs.package_name }}
+          - **ProGet Feed**: ${{ env.PROGET_FEED }}
+          - **Status**: Successfully published
+          EOF
