@@ -37,12 +37,32 @@ jobs:
         with:
           dotnet-version: '7.0.x'
 
-      - name: Install zip and Inedo Upack CLI
+      - name: Install zip and download Inedo Upack CLI
         run: |
           sudo apt-get update
-          sudo apt-get install -y zip
-          dotnet tool install --global Inedo.Upack || true
-          echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
+          sudo apt-get install -y zip curl tar
+
+          # Try to download the official upack Linux x64 release and install to /usr/local/bin
+          set -e
+          UPACK_ASSET_URL="https://github.com/Inedo/upack/releases/latest/download/upack-linux-x64.tar.gz"
+          echo "Downloading upack from ${UPACK_ASSET_URL}"
+          curl -sL "$UPACK_ASSET_URL" -o upack.tar.gz
+
+          tar -xzf upack.tar.gz
+
+          # Find the extracted upack executable and move it into /usr/local/bin
+          UPACK_BIN=$(find . -type f -name upack -print -quit || true)
+          if [ -z "$UPACK_BIN" ]; then
+            echo "Error: upack binary not found in archive"
+            ls -la
+            exit 1
+          fi
+
+          sudo mv "$UPACK_BIN" /usr/local/bin/upack
+          sudo chmod +x /usr/local/bin/upack
+
+          echo "Installed upack to /usr/local/bin/upack"
+          upack --version || true
 
       - name: Determine version
         id: version
