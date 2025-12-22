@@ -16,6 +16,7 @@ env:
   PROGET_FEED: ${{ vars.PROGET_FEED }}
   PROGET_API_KEY: ${{ secrets.PROGET_API_KEY }}
   MODULE_NAME: azure-flex-functionapp
+  MODULE_GROUP: ${{ vars.MODULE_GROUP || 'custom' }}
 
 jobs:
   build-and-publish:
@@ -35,7 +36,7 @@ jobs:
       - name: Setup .NET SDK
         uses: actions/setup-dotnet@v3
         with:
-          dotnet-version: '7.0.x'
+          dotnet-version: '10.0.x'
 
       - name: Install packaging prerequisites
         run: |
@@ -176,10 +177,24 @@ jobs:
           {
             "version": "${VERSION}",
             "name": "${MODULE_NAME}",
-            "namespace": "custom",
+            "namespace": "terraform__",
             "type": "module",
             "provider": "azurerm",
-            "source": "proget/custom/${MODULE_NAME}/azurerm"
+            "source": "packages.neillans.co.uk/terraform__/${MODULE_NAME}/azurerm"
+          }
+          EOF
+
+          # Create upack manifest required by ProGet Terraform feeds
+          cat > build/${MODULE_NAME}/upack.json << EOF
+          {
+            "group": "${MODULE_GROUP}",
+            "name": "${MODULE_NAME}",
+            "version": "${VERSION}",
+            "title": "Azure Flex Function App Terraform Module",
+            "description": "Azure Flex Consumption Plan Terraform Module",
+            "tags": ["terraform", "azurerm", "function-app"],
+            "_provider": "azurerm",
+            "_sourceRepository": "github.com/aneillans/azure-flex-functionapp"
           }
           EOF
           
@@ -190,24 +205,6 @@ jobs:
           
           echo "package_name=${PACKAGE_NAME}" >> $GITHUB_OUTPUT
           echo "Package created: ${PACKAGE_NAME}"
-
-      - name: Generate module metadata
-        id: metadata
-        run: |
-          VERSION=${{ steps.version.outputs.version }}
-          
-          cat > module_metadata.json << EOF
-          {
-            "name": "${MODULE_NAME}",
-            "version": "${VERSION}",
-            "provider": "azurerm",
-            "description": "Azure Flex Consumption Plan Terraform Module",
-            "source": "github.com/your-org/${MODULE_NAME}",
-            "tag": "v${VERSION}"
-          }
-          EOF
-          
-          cat module_metadata.json
 
       - name: Publish to ProGet using Inedo Upack CLI
         env:
