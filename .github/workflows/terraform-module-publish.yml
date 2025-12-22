@@ -27,6 +27,11 @@ jobs:
         with:
           fetch-depth: 0  # Full history for versioning
 
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: latest
+
       - name: Determine version
         id: version
         run: |
