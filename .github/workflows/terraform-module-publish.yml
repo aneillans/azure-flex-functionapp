@@ -234,8 +234,11 @@ jobs:
             exit 1
           fi
 
-          # Use upack to push the package to the specified server and feed
-          "$UPACK_CMD" push "${PACKAGE_PATH}" --server "${PROGET_SERVER}" --feed "${PROGET_FEED}" --api-key "${PROGET_API_KEY}"
+          # upack CLI expects the feed endpoint ("target") as the second positional argument
+          SERVER_BASE="${PROGET_SERVER%/}"
+          TARGET_URL="${SERVER_BASE}/upack/feeds/${PROGET_FEED}"
+
+          "$UPACK_CMD" push "${PACKAGE_PATH}" "${TARGET_URL}" --user "${PROGET_API_KEY}"
 
           if [ $? -eq 0 ]; then
             echo "✓ Package published successfully via upack"
