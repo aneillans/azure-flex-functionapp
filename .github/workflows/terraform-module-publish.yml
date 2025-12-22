@@ -12,8 +12,8 @@ on:
         type: string
 
 env:
-  PROGET_SERVER: ${{ secrets.PROGET_SERVER }}
-  PROGET_FEED: ${{ secrets.PROGET_FEED }}
+  PROGET_SERVER: ${{ vars.PROGET_SERVER }}
+  PROGET_FEED: ${{ vars.PROGET_FEED }}
   PROGET_API_KEY: ${{ secrets.PROGET_API_KEY }}
   MODULE_NAME: azure-flex-functionapp
 
