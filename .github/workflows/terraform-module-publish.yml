@@ -238,7 +238,7 @@ jobs:
           SERVER_BASE="${PROGET_SERVER%/}"
           TARGET_URL="${SERVER_BASE}/upack/feeds/${PROGET_FEED}"
 
-          "$UPACK_CMD" push "${PACKAGE_PATH}" "${TARGET_URL}" --user "${PROGET_API_KEY}"
+          "$UPACK_CMD" push "${PACKAGE_PATH}" "${TARGET_URL}" --user="${PROGET_API_KEY}"
 
           if [ $? -eq 0 ]; then
             echo "✓ Package published successfully via upack"
