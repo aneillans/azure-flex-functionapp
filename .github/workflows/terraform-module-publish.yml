@@ -45,8 +45,7 @@ jobs:
 
       - name: Install pgutil CLI
         run: |
-          dotnet tool install -g Inedo.ProGet.Tools
-          echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
+          dotnet tool install -g pgutil
           pgutil --version
 
       - name: Determine version
