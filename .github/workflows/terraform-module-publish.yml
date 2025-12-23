@@ -12,10 +12,11 @@ on:
         type: string
 
 env:
-  PROGET_SERVER: ${{ secrets.PROGET_SERVER }}
-  PROGET_FEED: ${{ secrets.PROGET_FEED }}
+  PROGET_SERVER: ${{ vars.PROGET_SERVER }}
+  PROGET_FEED: ${{ vars.PROGET_FEED }}
   PROGET_API_KEY: ${{ secrets.PROGET_API_KEY }}
   MODULE_NAME: azure-flex-functionapp
+  MODULE_GROUP: ${{ vars.MODULE_GROUP || 'terraform' }}
 
 jobs:
   build-and-publish:
@@ -26,6 +27,25 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0  # Full history for versioning
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: latest
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install packaging prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zip curl tar unzip file
+
+      - name: Install pgutil CLI
+        run: |
+          dotnet tool install -g pgutil
 
       - name: Determine version
         id: version
@@ -41,6 +61,71 @@ jobs:
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "Version: ${VERSION}"
 
+      - name: Build module package
+        id: build
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          PACKAGE_NAME="${MODULE_NAME}-${VERSION}.zip"
+          
+          # Create temporary build directory
+          mkdir -p build
+          mkdir -p build/terraform/
+          
+          # Copy terraform files to build directory maintaining structure
+          cp -r terraform/ build/terraform/
+          
+          # Include README and LICENSE if they exist
+          if [ -f README.md ]; then
+            cp README.md build/
+          fi
+          
+          if [ -f LICENSE ]; then
+            cp LICENSE build/
+          fi
+          
+          # Create module manifest (Terraform registry compatible)
+          cat > build/VERSION << EOF
+          {
+            "version": "${VERSION}",
+            "name": "${MODULE_NAME}",
+            "namespace": "terraform",
+            "type": "module",
+            "provider": "azurerm",
+            "source": "packages.neillans.co.uk/terraform/${MODULE_NAME}/azurerm"
+          }
+          EOF
+
+          # Create upack manifest required by ProGet Terraform feeds
+          cat > build/upack.json << EOF
+          {
+            "group": "${MODULE_GROUP}",
+            "name": "${MODULE_NAME}.azurerm",
+            "version": "${VERSION}",
+            "title": "Azure Flex Function App Terraform Module",
+            "description": "Azure Flex Consumption Plan Terraform Module",
+            "tags": ["terraform", "azurerm", "function-app"],
+            "_provider": "azurerm",
+            "_sourceRepository": "github.com/aneillans/azure-flex-functionapp"
+          }
+          EOF
+          
+          # Package the module as a zip
+          cd build
+          zip -r ../${PACKAGE_NAME} ./ > /dev/null
+          cd ..
+          
+          echo "package_name=${PACKAGE_NAME}" >> $GITHUB_OUTPUT
+          echo "Package created: ${PACKAGE_NAME}"
+
+      - name: Upload module artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: module-${{ steps.version.outputs.version }}
+          path: ${{ steps.build.outputs.package_name }}
+          if-no-files-found: ignore
+          retention-days: 14          
+
       - name: Validate Terraform Module
         run: |
           cd terraform
@@ -48,90 +133,25 @@ jobs:
           terraform validate
           terraform fmt -check -recursive
 
-      - name: Build module package
-        id: build
-        run: |
-          VERSION=${{ steps.version.outputs.version }}
-          PACKAGE_NAME="${MODULE_NAME}-${VERSION}.tar.gz"
-          
-          # Create temporary build directory
-          mkdir -p build
-          
-          # Copy terraform files to build directory maintaining structure
-          cp -r terraform/ build/${MODULE_NAME}/
-          
-          # Include README and LICENSE if they exist
-          if [ -f README.md ]; then
-            cp README.md build/${MODULE_NAME}/
-          fi
-          
-          if [ -f LICENSE ]; then
-            cp LICENSE build/${MODULE_NAME}/
-          fi
-          
-          # Create module manifest (Terraform registry compatible)
-          cat > build/${MODULE_NAME}/VERSION << EOF
-          {
-            "version": "${VERSION}",
-            "name": "${MODULE_NAME}",
-            "namespace": "custom",
-            "type": "module",
-            "provider": "azurerm",
-            "source": "proget/custom/${MODULE_NAME}/azurerm"
-          }
-          EOF
-          
-          # Package the module
-          cd build
-          tar -czf ../${PACKAGE_NAME} ${MODULE_NAME}/
-          cd ..
-          
-          echo "package_name=${PACKAGE_NAME}" >> $GITHUB_OUTPUT
-          echo "Package created: ${PACKAGE_NAME}"
-
-      - name: Generate module metadata
-        id: metadata
-        run: |
-          VERSION=${{ steps.version.outputs.version }}
-          
-          cat > module_metadata.json << EOF
-          {
-            "name": "${MODULE_NAME}",
-            "version": "${VERSION}",
-            "provider": "azurerm",
-            "description": "Azure Flex Consumption Plan Terraform Module",
-            "source": "github.com/your-org/${MODULE_NAME}",
-            "tag": "v${VERSION}"
-          }
-          EOF
-          
-          cat module_metadata.json
-
-      - name: Publish to ProGet
+      - name: Publish to ProGet using pgutil
         env:
           PACKAGE_PATH: ${{ steps.build.outputs.package_name }}
         run: |
           VERSION=${{ steps.version.outputs.version }}
-          
+
           if [ -z "$PROGET_SERVER" ] || [ -z "$PROGET_FEED" ] || [ -z "$PROGET_API_KEY" ]; then
             echo "Error: ProGet credentials not configured in secrets"
             exit 1
           fi
-          
-          echo "Publishing ${PACKAGE_PATH} to ProGet..."
-          
-          # Upload package to ProGet using REST API
-          curl -X POST \
-            -H "Authorization: Bearer ${PROGET_API_KEY}" \
-            -H "Content-Type: multipart/form-data" \
-            -F "file=@${PACKAGE_PATH}" \
-            "${PROGET_SERVER}/api/v3/feeds/terraform-modules/package-upload?feed=${PROGET_FEED}" \
-            -v
-          
+
+          echo "Publishing ${PACKAGE_PATH} to ProGet via pgutil..."
+
+          pgutil packages upload --source="${PROGET_SERVER}" --api-key="${PROGET_API_KEY}" --input-file="${PACKAGE_PATH}" --feed="${PROGET_FEED}"
+
           if [ $? -eq 0 ]; then
-            echo "✓ Package published successfully"
+            echo "✓ Package published successfully via pgutil"
           else
-            echo "✗ Failed to publish package"
+            echo "✗ Failed to publish package via pgutil"
             exit 1
           fi
 
