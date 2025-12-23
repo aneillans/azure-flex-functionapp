@@ -2,6 +2,13 @@
 
 A simple module wrapper for Flex Consumption Plans for Terraform
 
+### Downloading / Consuming
+
+You can use this module from my public [Proget](https://inedo.com/proget) feeds hosted here:
+https://packages.neillans.co.uk/feeds/terraform
+
+This Proget server is available through the generosity of Inedo providing a license for Open Source projects.
+
 ### Example Usage
 
 Below is an example of how to use this module in your Terraform configuration:
