@@ -43,92 +43,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y zip curl tar unzip file
 
-      - name: Download and install Inedo Upack CLI
-        id: install-upack
-        shell: pwsh
+      - name: Install pgutil CLI
         run: |
-          $ErrorActionPreference = 'Stop'
-          $apiUrl = 'https://api.github.com/repos/Inedo/upack/releases/latest'
-          Write-Host "Querying $apiUrl"
-          $release = Invoke-RestMethod -Uri $apiUrl -UseBasicParsing
-          if (-not $release.assets) {
-            throw "Failed to find assets in upack release metadata."
-          }
-
-          $candidateAssets = $release.assets | Where-Object { $_.name -notmatch 'musl' }
-          if (-not $candidateAssets) {
-            $candidateAssets = $release.assets
-          }
-
-          function Get-AssetScore([string]$name) {
-            if (-not $name) { return 0 }
-            $n = $name.ToLower()
-            $score = 0
-            if ($n -match 'linux') { $score += 10 }
-            if ($n -match 'x64' -or $n -match 'x86_64' -or $n -match '64') { $score += 5 }
-            if ($n -like '*.tar.gz' -or $n -like '*.tgz') { $score += 3 }
-            if ($n -like '*.zip') { $score += 2 }
-            return $score
-          }
-
-          $asset = $candidateAssets |
-            Sort-Object @{ Expression = { Get-AssetScore $_.name }; Descending = $true } |
-            Select-Object -First 1
-
-          if (-not $asset -or -not $asset.browser_download_url) {
-            throw "Unable to determine a suitable upack asset to download."
-          }
-
-          $downloadUrl = $asset.browser_download_url
-          $tempDir = Join-Path $env:RUNNER_TEMP 'upack'
-          New-Item -ItemType Directory -Force -Path $tempDir | Out-Null
-          $assetPath = Join-Path $tempDir $asset.name
-
-          Write-Host "Downloading upack from $downloadUrl"
-          Invoke-WebRequest -Uri $downloadUrl -OutFile $assetPath -UseBasicParsing
-
-          $extractDir = Join-Path $tempDir 'extract'
-          New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
-
-          $nameLower = ($asset.name ?? '').ToLower()
-          if ($nameLower -like '*.tar.gz' -or $nameLower -like '*.tgz') {
-            & tar -xzf $assetPath -C $extractDir
-          }
-          elseif ($nameLower -like '*.zip') {
-            Expand-Archive -Path $assetPath -DestinationPath $extractDir -Force
-          }
-          else {
-            Copy-Item $assetPath (Join-Path $extractDir 'upack') -Force
-          }
-
-          $binary = Get-ChildItem -Path $extractDir -Recurse -File |
-            Where-Object { $_.Name -eq 'upack' } |
-            Select-Object -First 1
-
-          if (-not $binary) {
-            $binary = Get-Item $assetPath -ErrorAction SilentlyContinue
-          }
-
-          if (-not $binary) {
-            throw "upack executable not found after extracting the asset."
-          }
-
-          $destination = '/usr/local/bin/upack'
-          sudo mv "$($binary.FullName)" $destination
-          sudo chmod +x $destination
-
-          if (-not (Test-Path $destination)) {
-            throw "upack binary missing after installation at $destination"
-          }
-
-          $versionOutput = & $destination version 2>$null
-          $versionLine = ($versionOutput | Select-Object -First 1)
-          if (-not $versionLine) {
-            $versionLine = 'unknown-version'
-          }
-          Write-Host "Installed upack ($versionLine)"
-
-          "upack-path=$destination" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          dotnet tool install -g Inedo.ProGet.Tools
+          echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
+          pgutil --version
 
       - name: Determine version
         id: version
@@ -182,7 +101,7 @@ jobs:
           cat > build/upack.json << EOF
           {
             "group": "${MODULE_GROUP}",
-            "name": "${MODULE_NAME}",
+            "name": "${MODULE_NAME}.azurerm",
             "version": "${VERSION}",
             "title": "Azure Flex Function App Terraform Module",
             "description": "Azure Flex Consumption Plan Terraform Module",
@@ -216,12 +135,9 @@ jobs:
           terraform validate
           terraform fmt -check -recursive
 
-
-
-      - name: Publish to ProGet using Inedo Upack CLI
+      - name: Publish to ProGet using pgutil
         env:
           PACKAGE_PATH: ${{ steps.build.outputs.package_name }}
-          UPACK_PATH: ${{ steps.install-upack.outputs.upack-path }}
         run: |
           VERSION=${{ steps.version.outputs.version }}
 
@@ -230,32 +146,14 @@ jobs:
             exit 1
           fi
 
-          echo "Publishing ${PACKAGE_PATH} to ProGet via Inedo Upack CLI..."
+          echo "Publishing ${PACKAGE_PATH} to ProGet via pgutil..."
 
-          # Locate upack CLI (prefer the path from the install step)
-          if [ -n "$UPACK_PATH" ] && [ -x "$UPACK_PATH" ]; then
-            UPACK_CMD="$UPACK_PATH"
-          elif [ -x "/usr/local/bin/upack" ]; then
-            UPACK_CMD="/usr/local/bin/upack"
-          elif [ -x "$HOME/.dotnet/tools/upack" ]; then
-            UPACK_CMD="$HOME/.dotnet/tools/upack"
-          elif command -v upack >/dev/null 2>&1; then
-            UPACK_CMD="$(command -v upack)"
-          else
-            echo "Error: upack CLI not found (checked UPACK_PATH env, /usr/local/bin/upack, $HOME/.dotnet/tools/upack, and PATH)"
-            exit 1
-          fi
-
-          # upack CLI expects the feed endpoint ("target") as the second positional argument
-          SERVER_BASE="${PROGET_SERVER%/}"
-          TARGET_URL="${SERVER_BASE}/upack/feeds/${PROGET_FEED}"
-
-          "$UPACK_CMD" push "${PACKAGE_PATH}" "${TARGET_URL}" --user="${PROGET_API_KEY}"
+          pgutil packages upload --source="${PROGET_SERVER}" --api-key="${PROGET_API_KEY}" --input-file="${PACKAGE_PATH}" --feed="${PROGET_FEED}"
 
           if [ $? -eq 0 ]; then
-            echo "✓ Package published successfully via upack"
+            echo "✓ Package published successfully via pgutil"
           else
-            echo "✗ Failed to publish package via upack"
+            echo "✗ Failed to publish package via pgutil"
             exit 1
           fi
 
