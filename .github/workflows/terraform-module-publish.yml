@@ -46,7 +46,6 @@ jobs:
       - name: Install pgutil CLI
         run: |
           dotnet tool install -g pgutil
-          pgutil --version
 
       - name: Determine version
         id: version
