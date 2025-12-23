@@ -16,7 +16,7 @@ env:
   PROGET_FEED: ${{ vars.PROGET_FEED }}
   PROGET_API_KEY: ${{ secrets.PROGET_API_KEY }}
   MODULE_NAME: azure-flex-functionapp
-  MODULE_GROUP: ${{ vars.MODULE_GROUP || 'custom' }}
+  MODULE_GROUP: ${{ vars.MODULE_GROUP || 'terraform' }}
 
 jobs:
   build-and-publish:
@@ -171,10 +171,10 @@ jobs:
           {
             "version": "${VERSION}",
             "name": "${MODULE_NAME}",
-            "namespace": "terraform__",
+            "namespace": "terraform",
             "type": "module",
             "provider": "azurerm",
-            "source": "packages.neillans.co.uk/terraform__/${MODULE_NAME}/azurerm"
+            "source": "packages.neillans.co.uk/terraform/${MODULE_NAME}/azurerm"
           }
           EOF
 
