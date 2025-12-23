@@ -144,13 +144,6 @@ jobs:
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "Version: ${VERSION}"
 
-      - name: Validate Terraform Module
-        run: |
-          cd terraform
-          terraform init -backend=false
-          terraform validate
-          terraform fmt -check -recursive
-
       - name: Build module package
         id: build
         run: |
@@ -159,23 +152,22 @@ jobs:
           
           # Create temporary build directory
           mkdir -p build
-          mkdir -p build/${MODULE_NAME}
-          mkdir -p build/${MODULE_NAME}/terraform/
+          mkdir -p build/terraform/
           
           # Copy terraform files to build directory maintaining structure
-          cp -r terraform/ build/${MODULE_NAME}/terraform/
+          cp -r terraform/ build/terraform/
           
           # Include README and LICENSE if they exist
           if [ -f README.md ]; then
-            cp README.md build/${MODULE_NAME}/
+            cp README.md build/
           fi
           
           if [ -f LICENSE ]; then
-            cp LICENSE build/${MODULE_NAME}/
+            cp LICENSE build/
           fi
           
           # Create module manifest (Terraform registry compatible)
-          cat > build/${MODULE_NAME}/VERSION << EOF
+          cat > build/VERSION << EOF
           {
             "version": "${VERSION}",
             "name": "${MODULE_NAME}",
@@ -187,7 +179,7 @@ jobs:
           EOF
 
           # Create upack manifest required by ProGet Terraform feeds
-          cat > build/${MODULE_NAME}/upack.json << EOF
+          cat > build/upack.json << EOF
           {
             "group": "${MODULE_GROUP}",
             "name": "${MODULE_NAME}",
@@ -202,7 +194,7 @@ jobs:
           
           # Package the module as a zip
           cd build
-          zip -r ../${PACKAGE_NAME} ${MODULE_NAME}/ > /dev/null
+          zip -r ../${PACKAGE_NAME} ./ > /dev/null
           cd ..
           
           echo "package_name=${PACKAGE_NAME}" >> $GITHUB_OUTPUT
@@ -215,7 +207,16 @@ jobs:
           name: module-${{ steps.version.outputs.version }}
           path: ${{ steps.build.outputs.package_name }}
           if-no-files-found: ignore
-          retention-days: 14
+          retention-days: 14          
+
+      - name: Validate Terraform Module
+        run: |
+          cd terraform
+          terraform init -backend=false
+          terraform validate
+          terraform fmt -check -recursive
+
+
 
       - name: Publish to ProGet using Inedo Upack CLI
         env:
