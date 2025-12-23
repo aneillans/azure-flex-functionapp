@@ -159,6 +159,8 @@ jobs:
           
           # Create temporary build directory
           mkdir -p build
+          mkdir -p build/${MODULE_NAME}
+          mkdir -p build/${MODULE_NAME}/terraform/
           
           # Copy terraform files to build directory maintaining structure
           cp -r terraform/ build/${MODULE_NAME}/terraform/
