@@ -161,7 +161,7 @@ jobs:
           mkdir -p build
           
           # Copy terraform files to build directory maintaining structure
-          cp -r terraform/ build/${MODULE_NAME}/
+          cp -r terraform/ build/${MODULE_NAME}/terraform/
           
           # Include README and LICENSE if they exist
           if [ -f README.md ]; then
@@ -205,6 +205,15 @@ jobs:
           
           echo "package_name=${PACKAGE_NAME}" >> $GITHUB_OUTPUT
           echo "Package created: ${PACKAGE_NAME}"
+
+      - name: Upload module artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: module-${{ steps.version.outputs.version }}
+          path: ${{ steps.build.outputs.package_name }}
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Publish to ProGet using Inedo Upack CLI
         env:
